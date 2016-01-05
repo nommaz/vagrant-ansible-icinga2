@@ -1,0 +1,141 @@
+---
+# tasks file for roles/icinga2
+- name: add key of repository
+  apt_key:
+    url: http://packages.icinga.org/icinga.key
+    state: present
+
+- name: add repository
+  apt_repository:
+    repo: "deb http://packages.icinga.org/debian icinga-{{ ansible_distribution_release }} main"
+    update_cache: yes
+
+- name: install
+  apt:
+    name: "{{ item }}"
+    update_cache: yes
+  with_items:
+    - php5-imagick
+    - php5-intl
+    - php5-gd
+    - php5-mysql
+    - php5-pgsql
+    - icingaweb2
+    - icinga2
+    - mysql-client
+    - python-mysqldb
+    - icinga2-ido-mysql
+
+- name: install MySql
+  apt:
+    name: "{{ item }}"
+  with_items:
+    - mysql-server
+  register: icinga2_mysql_install
+
+- name: set up password to root
+  mysql_user:
+    login_host: "{{ icinga2_mysql_host }}"
+    login_port: "{{ icinga2_mysql_port }}"
+    login_user: root
+    name: root
+    password: "{{ icinga2_mysql_auth_pass }}"
+  when: icinga2_mysql_install.changed
+
+- name: create DB -- icinga2
+  mysql_db:
+    login_host: "{{ icinga2_mysql_host }}"
+    login_port: "{{ icinga2_mysql_port }}"
+    login_user: "{{ icinga2_mysql_auth_user }}"
+    login_password: "{{ icinga2_mysql_auth_pass }}"
+    name: "{{ icinga2_db }}"
+  register: icinga2_create_db
+
+- name: create DB -- web auth
+  mysql_db:
+    login_host: "{{ icinga2_mysql_host }}"
+    login_port: "{{ icinga2_mysql_port }}"
+    login_user: "{{ icinga2_mysql_auth_user }}"
+    login_password: "{{ icinga2_mysql_auth_pass }}"
+    name: "{{ icinga2_db_auth }}"
+  register: icinga2_web_create_db
+
+- name: import IDO schema
+  mysql_db:
+    login_host: "{{ icinga2_mysql_host }}"
+    login_port: "{{ icinga2_mysql_port }}"
+    login_user: "{{ icinga2_mysql_auth_user }}"
+    login_password: "{{ icinga2_mysql_auth_pass }}"
+    state: import
+    name: "{{ icinga2_db }}"
+    target: /usr/share/icinga2-ido-mysql/schema/mysql.sql
+  when: icinga2_create_db.changed
+
+- name: create mysql user and set up permission for db of icinga2
+  mysql_user:
+    login_host: "{{ icinga2_mysql_host }}"
+    login_port: "{{ icinga2_mysql_port }}"
+    login_user: "{{ icinga2_mysql_auth_user }}"
+    login_password: "{{ icinga2_mysql_auth_pass }}"
+    name: "{{ icinga2_db_user }}"
+    password: "{{ icinga2_db_pass }}"
+    priv: "{{ icinga2_db }}.*:SELECT,INSERT,UPDATE,DELETE,DROP,CREATE VIEW,INDEX,EXECUTE"
+    host: "localhost"
+
+- name: create mysql user and set up permission for db of web auth
+  mysql_user:
+    login_host: "{{ icinga2_mysql_host }}"
+    login_port: "{{ icinga2_mysql_port }}"
+    login_user: "{{ icinga2_mysql_auth_user }}"
+    login_password: "{{ icinga2_mysql_auth_pass }}"
+    name: "{{ icinga2_db_auth_user }}"
+    password: "{{ icinga2_db_auth_pass }}"
+    priv: "{{ icinga2_db_auth }}.*:SELECT,INSERT,UPDATE,DELETE,DROP,CREATE VIEW,INDEX,EXECUTE"
+    host: "localhost"
+
+- name: enable IDO MySql module
+  command: icinga2 feature enable ido-mysql
+  register: icinga2_enable_ido_mysql
+
+- name: set up configuration file of IDO MySql module
+  template:
+    src: ido-mysql.conf.j2
+    dest: /etc/icinga2/features-available/ido-mysql.conf
+    owner: nagios
+    group: nagios
+    mode: 0600
+  notify: restart icinga2
+
+- name: set up default timezone
+  lineinfile:
+    dest: /etc/php5/apache2/php.ini
+    regexp: "^;date.timezone"
+    line: "date.timezone = {{ icinga2_php_timezone }}"
+  notify: restart apache2
+
+- name: check file /etc/icingaweb2/setup.token
+  tags:
+    - read-token
+  stat:
+    path: /etc/icingaweb2/setup.token
+  register: icinga2_web_token_st
+
+- name: getting token (create)
+  command: icingacli setup token create
+  register: icingaweb2_web_token_create
+  when: icinga2_web_token_st.stat.exists == False
+
+- name: getting token (read)
+  tags: read-token
+  command: icingacli setup token show
+  register: icingaweb2_web_token_read
+  when: icinga2_web_token_st.stat.exists == True
+
+- debug:
+    msg: "Now go at http://{{ ansible_default_ipv4.address }}/icingaweb2/setup to continue the installation using token: {{ icingaweb2_web_token_create.stdout.split()[-1:] }}"
+  when: icinga2_web_token_st.stat.exists == False
+
+- tags: read-token
+  debug:
+    msg: "Now go at http://{{ ansible_default_ipv4.address }}/icingaweb2/setup to continue the installation using token: {{ icingaweb2_web_token_read.stdout.split()[-1:] }}"
+  when: icinga2_web_token_st.stat.exists == True
