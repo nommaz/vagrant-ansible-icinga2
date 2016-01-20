@@ -6,13 +6,14 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "ubuntu" do |ubuntu|
     ubuntu.vm.box = "ubuntu/trusty64"
-    ubuntu.vm.hostname = "ubuntu"
+    ubuntu.vm.hostname = "mon01"
     ubuntu.vm.synced_folder ".", "/vagrant"
     ubuntu.vm.network "private_network", ip: "192.168.90.10"
   end
 
   config.vm.provision "ansible" do |ansible|
     ansible.playbook = "tasks/main.yml"
+    ansible.verbose = "vvv"
   end
 
 end
