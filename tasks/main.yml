@@ -41,11 +41,11 @@
     mysql_user: name=vagrant password=PASSWORD priv=*.*:ALL state=present
     when: icinga2_mysql_install.changed
 
-  - name: create DB -- icinga2
+  - name: create DB -- icinga2_db
     mysql_db: name=icinga2_db login_user=vagrant login_password=PASSWORD state=present
     register: icinga2_create_db
 
-  - name: create DB -- web auth
+  - name: create DB -- icinga2_db_auth
     mysql_db: name=icinga2_db_auth login_user=vagrant login_password=PASSWORD state=present
     register: icinga2_web_create_db
 
