@@ -1,9 +1,4 @@
----
-# tasks file for roles/icinga2
-- hosts: all
-  sudo: yes
 
-  tasks:
   - name: Add icinga repository key
     apt_key:
       url: http://packages.icinga.org/icinga.key
@@ -106,9 +101,3 @@
       msg: "Now go at http://192.168.90.10/icingaweb2/setup to continue the installation using token: {{ icingaweb2_web_token_read.stdout.split()[-1:] }}"
     when: icinga2_web_token_st.stat.exists == True
 
-  handlers:
-    - name: restart apache
-      service: name=apache2 state=restarted
-
-    - name: restart icinga2
-      service: name=icinga2 state=restarted

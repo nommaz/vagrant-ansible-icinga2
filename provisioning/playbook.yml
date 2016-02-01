@@ -1,0 +1,34 @@
+---
+# ansible-playbook -i ../../common/XXX/hosts icinga2.yml -u YYY -v 
+# XXX: dev,test,prod
+# YYY: remote user login name
+
+#########################
+# CIS Hardening         #
+#########################
+
+- hosts: monitoring
+  sudo: true
+  tags: cis
+  roles:
+#    - ansible-cis
+
+#########################
+# MySQL                 #
+#########################
+
+- hosts: monitoring
+  sudo: true
+  tags: mysql
+  roles:
+    - role: icinga2
+    
+#########################
+# OSSEC Client          #
+#########################
+
+- hosts: monitoring
+  sudo: true
+  tags: ossec
+  roles:
+#    - ansible-ossec-agent

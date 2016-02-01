@@ -1,19 +1,28 @@
-Vagrant.configure(2) do |config|
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
 
-  #
-  # Run Ansible from the Vagrant Host
-  #
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
 
-  config.vm.define "ubuntu" do |ubuntu|
-    ubuntu.vm.box = "ubuntu/trusty64"
-    ubuntu.vm.hostname = "mon01"
-    ubuntu.vm.synced_folder ".", "/vagrant"
-    ubuntu.vm.network "private_network", ip: "192.168.90.10"
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+  # set to false, if you do NOT want to check the correct VirtualBox Guest Additions version when booting this box
+  if defined?(VagrantVbguest::Middleware)
+    config.vbguest.auto_update = true
   end
 
-  config.vm.provision "ansible" do |ansible|
-    ansible.playbook = "tasks/main.yml"
-    # ansible.verbose = "vvv"
+  config.vm.box = "ubuntu/trusty64"
+  config.vm.hostname = 'icinga2.local'
+  config.vm.network :private_network, ip: '192.168.88.20'
+  config.ssh.shell = "bash -c 'BASH_ENV=/etc/profile exec bash'"
+
+  config.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "2048"]
   end
 
+  config.vm.synced_folder "../common", "/common"
+
+  config.vm.provision :shell,
+    :keep_color => true,
+    :path => "setup.sh"
 end
